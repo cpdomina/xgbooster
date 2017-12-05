@@ -1,0 +1,78 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 22e8c476..d58fa73a 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -2,7 +2,7 @@ cmake_minimum_required (VERSION 3.2)
+ project(xgboost)
+ include(cmake/Utils.cmake)
+ list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake/modules")
+-find_package(OpenMP)
++#find_package(OpenMP)
+ 
+ set_default_configuration_release()
+ msvc_use_static_runtime()
+@@ -50,6 +50,8 @@ if(USE_AVX)
+   add_definitions(-DXGBOOST_USE_AVX)
+ endif()
+ 
++# We need this to be present when any file included dmlc headers is included (not just for dmlc code)
++set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DDISABLE_OPENMP")
+ 
+ # compiled code customizations for R package
+ if(R_LIB)
+@@ -190,7 +192,7 @@ else()
+     OUTPUT_NAME xgboost
+   )
+   set_output_directory(runxgboost ${PROJECT_SOURCE_DIR})
+-  target_link_libraries(runxgboost ${LINK_LIBRARIES})
++  target_link_libraries(runxgboost ${LINK_LIBRARIES} pthread)
+ 
+   # Shared library
+   add_library(xgboost SHARED $<TARGET_OBJECTS:objxgboost>)
+diff --git a/dmlc-core b/dmlc-core
+--- a/dmlc-core
++++ b/dmlc-core
+@@ -1 +1 @@
+-Subproject commit b5bec5481df86e8e6728d8bd80a61d87ef3b2cd5
++Subproject commit b5bec5481df86e8e6728d8bd80a61d87ef3b2cd5-dirty
+diff --git a/include/xgboost/base.h b/include/xgboost/base.h
+index 24ff4d39..77ffedb4 100644
+--- a/include/xgboost/base.h
++++ b/include/xgboost/base.h
+@@ -51,7 +51,7 @@
+ #endif
+ 
+ #if defined(__GNUC__) && ((__GNUC__ == 4 && __GNUC_MINOR__ >= 8) || __GNUC__ > 4) && \
+-    !defined(__CUDACC__)
++    !defined(__CUDACC__) && !defined(DISABLE_OPENMP)
+ #include <parallel/algorithm>
+ #define XGBOOST_PARALLEL_SORT(X, Y, Z) __gnu_parallel::sort((X), (Y), (Z))
+ #define XGBOOST_PARALLEL_STABLE_SORT(X, Y, Z) \
+diff --git a/jvm-packages/create_jni.py b/jvm-packages/create_jni.py
+index 8ce0aa1b..703a2630 100755
+--- a/jvm-packages/create_jni.py
++++ b/jvm-packages/create_jni.py
+@@ -14,7 +14,7 @@ if sys.platform.startswith("linux"):
+ 
+ 
+ CONFIG = {
+-    "USE_OPENMP": "ON",
++    "USE_OPENMP": "OFF",
+     "USE_HDFS": "OFF",
+     "USE_AZURE": "OFF",
+     "USE_S3": "OFF",
+@@ -85,7 +85,7 @@ if __name__ == "__main__":
+                 maybe_generator = ""
+ 
+             args = ["-D{0}:BOOL={1}".format(k, v) for k, v in CONFIG.items()]
+-            run("cmake .. " + " ".join(args) + maybe_generator)
++            run("cmake .. -DCMAKE_VERBOSE_MAKEFILE=1 " + " ".join(args) + maybe_generator)
+             run("cmake --build . --config Release")
+ 
+         with cd("demo/regression"):
+diff --git a/rabit b/rabit
+--- a/rabit
++++ b/rabit
+@@ -1 +1 @@
+-Subproject commit a764d45cfb438cc9f15cf47ce586c02ff2c65d0f
++Subproject commit a764d45cfb438cc9f15cf47ce586c02ff2c65d0f-dirty
